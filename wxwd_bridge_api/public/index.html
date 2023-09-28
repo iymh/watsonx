@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watson Discovery & watsonx.ai</title>
+  <style>
+    [v-cloak] {
+      display: none;
+    }
+    .wdt2 {
+      width: 2rem;
+    }
+    .wdt5 {
+      width: 5rem;
+    }
+    .wdt10 {
+      width: 10rem;
+    }
+    .wdt12 {
+      width: 12rem;
+    }
+
+    /* for highlight in discovery result. */
+    em {
+      font-weight: bold;
+      color: red;
+    }
+
+    .retbox {
+      /* width: 95vw; */
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app" v-cloak>
+    <v-app>
+      <v-app-bar app>
+        <v-app-bar-title>RAG2.0 concept</v-app-bar-title>
+        <v-spacer></v-spacer>
+      </v-app-bar>
+
+      <!-- Toast Component -->
+      <v-snackbar
+        v-model="toast.show"
+        bottom
+        multi-line
+        :timeout="toast.timeout"
+        :color="toast.type"
+        @click="toast.show = false">
+        <div class="rw">{{ toast.text }}</div>
+      </v-snackbar>
+
+      <v-dialog id="pr_dialog" v-model="dc_param_dialog">
+        <v-card class="">
+          <v-card-title>
+            <span class="text-h5">Query Parameters</span>
+          </v-card-title>
+          <v-card-text class="flex-grow-1">
+            <v-textarea
+              v-model="dc_paramjson"
+              label="Request Params"
+              outlined
+              rows="5"
+            ></v-textarea>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="secondary"
+              @click="dc_param_dialog=false">
+              Cancel
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-main>
+        <v-container>
+          <v-row class="align-center ma-3">
+            <v-col class="col-4">
+              <v-btn 
+                color="primary"
+                :loading="isAuthLoading"
+                @click="getToken()">
+                <v-icon left>mdi-account-sync</v-icon>IBMCloud Auth
+              </v-btn>
+            </v-col>
+            <v-col class="col-4">
+              <div>Expiration:</div><div v-if="token.expiration">{{ convertUnixTime(token.expiration) }}</div>
+            </v-col>
+            <v-col class="col-4">
+              <div>User ID:</div><div v-if="token.ims_user_id">{{ token.ims_user_id }}</div>
+            </v-col>
+          </v-row>
+
+          <v-divider></v-divider>
+          <div class="ma-2">
+            <v-row class="justify-center align-center ma-3">
+              <v-combobox
+                class="flex-grow-1 ma_lr_1rem ma_tp_05rem"
+                v-model="dc_inputnlq"
+                :items="dc_inputnlq_items"
+                label="Natural Language Query"
+                outlined
+                clearable
+                counter
+                dense
+                rows="1"
+                ref="nlq_combobox"
+              ></v-combobox>
+
+              <v-btn
+                color="primary"
+                elevation="1"
+                fab
+                @click="onSearchBtn()">
+                <v-icon>mdi-card-search-outline</v-icon>
+              </v-btn>
+            </v-row>
+
+            <v-expansion-panels>
+              <v-expansion-panel>
+                <v-expansion-panel-header>
+                  <div class="wdt12">Discovery Options</div>
+                  <v-progress-linear
+                    v-if="dc_tbl_loading"
+                    indeterminate
+                    color="primary"
+                  ></v-progress-linear>
+                </v-expansion-panel-header>
+                <v-expansion-panel-content>
+                  <v-row class="justify-center align-center ma-3">
+                    <v-select
+                      class="wdt12"
+                      label="Project"
+                      outlined
+                      dense
+                      :items="dc_projects"
+                      item-text="name"
+                      item-value="project_id"
+                      v-model="dc_project_selected"
+                      return-object
+                      hide-details
+                    ></v-select>
+
+                    <v-select
+                      label="Collections"
+                      outlined
+                      dense
+                      multiple
+                      :items="dc_collections"
+                      item-text="name"
+                      item-value="collection_id"
+                      v-model="dc_collections_selected"
+                      return-object
+                      hide-details
+                    ></v-select>
+
+                    <v-btn color="primary"
+                      class="ml-1"
+                      icon elevation="1"
+                      @click="dc_param_dialog=true">
+                      <v-icon>mdi-code-json</v-icon>
+                    </v-btn>
+                  </v-row>
+
+                  <v-divider></v-divider>
+                  <div class="text-h5 primary--text mb-2">Result:</div>
+                  <v-row class="justify-center">
+                    <div class="flex-grow-1">
+                      <v-data-table
+                        :items = "dc_outputjsons"
+                        :loading = "dc_tbl_loading"
+                        disable-pagination
+                        disable-sort
+                        :items-per-page="100"
+                        no-data-text="データがありません"
+                        hide-default-header
+                        hide-default-footer
+                        fixed
+                      >
+                        <template v-slot:[`item`]="{ item }">
+                          <div class="ma-2 elevation-1">
+
+                            <div class="d-flex align-center">
+                              <div class="wdt2 text-center">{{ item.no }}</div>
+                              <!-- File Name -->
+                              <v-icon v-if="item.extracted_metadata.file_type" class="secondary--text">{{ getMdiIcon(item.extracted_metadata.file_type) }}</v-icon>
+                              <div v-if="(item.metadata.source && item.metadata.source.url && item.extracted_metadata.filename)" class="text-h6">
+                                <a :href="item.metadata.source.url" target="_blank">{{ item.extracted_metadata.filename }}</a>
+                              </div>
+                            </div>
+
+                            <div class="ma-2">
+                              <!-- Answer Findings -->
+                              <div class="d-flex" v-if="item.document_passages.length > 0 && item.document_passages[0].answers && item.document_passages[0].answers.length > 0">
+                                <div class="flex-grow-1 accent">{{ item.document_passages[0].answers[0].answer_text }}</div>
+                                <div class="wdt10 info--text text-center" v-if="item.document_passages[0].answers[0].confidence">回答スコア: {{ `${(item.document_passages[0].answers[0].confidence *100).toFixed(1)}` }}</div>
+                              </div>
+
+                              <!-- Title -->
+                              <div class="d-flex align-center elevation-1" v-if="item.extracted_metadata">
+                                <div class="flex-grow-1 primary--text">{{ item.extracted_metadata.title }}</div>
+                                <div class="wdt10 info text-center" v-if="item.result_metadata.confidence">検索スコア: {{ `${(item.result_metadata.confidence *100).toFixed(1)}` }}</div>
+                              </div>
+
+                              <!-- Passages -->
+                              <div class="" v-if="item.document_passages.length > 0" v-html="item.document_passages[0].passage_text"></div>
+
+                              <!-- Customize field -->
+                              <div class="" v-if="item.answer && item.answer.length > 0">A: {{ item.answer }}</div>
+                              <div class="warning--text" v-if="item.question && item.question.length > 0">Q: {{ item.question }}</div>
+
+                              <div class="d-flex justify-sm-space-between">
+                                <!-- Collection Name -->
+                                <div v-if="item.result_metadata.collection_id" class="text-sm-caption info--text ma_lr_1rem">
+                                  {{ getCollectionsNames(item.result_metadata.collection_id) }}
+                                </div>
+                                <!-- Source Path -->
+                                <div v-if="(item.metadata.source && item.metadata.source.path_text)" class="text-sm-caption secondary--text">
+                                  {{ item.metadata.source.path_text }}
+                                </div>
+                              </div>
+
+                            </div>
+                          </div>
+
+                        </template>
+                      </v-data-table>
+                    </div>
+                  </v-row>
+                </v-expansion-panel-content>
+              </v-expansion-panel>
+
+              <v-expansion-panel>
+                <v-expansion-panel-header>
+                  <div class="wdt12">watsonx.ai Options</div>
+                  <v-progress-linear
+                    v-if="isLoading"
+                    indeterminate
+                    color="secondary"
+                  ></v-progress-linear>
+                </v-expansion-panel-header>
+                <v-expansion-panel-content>
+                  <v-row class="align-center ma-3">
+                    <v-col class="col-4">
+                      <v-select
+                        label="Model"
+                        outlined
+                        dense
+                        :items="model_items"
+                        item-text="name"
+                        item-value="val"
+                        v-model="model_selected"
+                        return-object
+                        hide-details
+                      ></v-select>
+                    </v-col>
+                    <!-- <v-col class="col-4">
+                      <v-switch
+                        v-model="stream"
+                        label="Stream"
+                      ></v-switch>
+                    </v-col> -->
+                    <v-col class="col-4">
+                      <v-switch
+                        v-model="decoding_method"
+                        label="Decode Type"
+                      ></v-switch>
+                    </v-col>
+                  </v-row>
+                  <v-row class="justify-center align-center ma-3">
+                    <v-col class="col-10">
+                      <v-range-slider
+                        label="min-max token size"
+                        hide-details
+                        dense
+                        v-model="min_max_tokens"
+                        step=10
+                        max=1024
+                        min=0
+                        thumb-label="always"
+                      ></v-slider>
+                    </v-col>
+                  </v-row>
+
+                  <v-row class="justify-center align-center ma-3">
+                    <div class="flex-grow-1">
+                      <v-textarea
+                        rows="2"
+                        filled
+                        label="System Prompt"
+                        v-model="system_prompt"
+                        clearable
+                        counter
+                      ></v-textarea>
+                    </div>
+                  </v-row>
+
+                  <v-row class="justify-center align-center ma-3">
+                    <div class="flex-grow-1">
+                      <v-textarea
+                        rows="4"
+                        filled
+                        label="User Prompt"
+                        v-model="user_prompt"
+                        clearable
+                        counter
+                      ></v-textarea>
+                    </div>
+                  </v-row>
+
+                  <v-row class="justify-center align-center ma-3">
+                    <v-btn 
+                      class="mr-1"
+                      color="primary"
+                      @click="createPromptShot()">
+                      <v-icon left>mdi-text-box-edit-outline</v-icon>Create Template
+                    </v-btn>
+                    <v-btn 
+                      class="ml-1"
+                      color="primary"
+                      :loading="isLoading"
+                      @click="onSendBtn()">
+                      <v-icon left>mdi-head-snowflake-outline</v-icon>Generate Text
+                    </v-btn>
+                  </v-row>
+
+                  <v-divider></v-divider>
+
+                  <div class="text-h5 primary--text">Result:</div>
+
+                  <v-row class="justify-center">
+                    <v-col class="col-3">
+                      <div>input token:<br/> {{ input_token_count }}</div>
+                    </v-col>
+                    <v-col class="col-3">
+                      <div>output token:<br/> {{ generated_token_count }}</div>
+                    </v-col>
+                    <v-col class="col-3">
+                      <div>stop reason:<br/> {{ stop_reason }}</div>
+                    </v-col>
+                    <v-col class="col-3">
+                      <div> use tokens:<br/> {{ input_token_count + generated_token_count }}</div>
+                    </v-col>
+                  </v-row>
+
+                  <v-row class="justify-center">
+                    <v-col class="col-2">
+                      <div> use Class: {{ model_selected.class }}</div>
+                    </v-col>
+                    <v-col class="col-4">
+                      <v-text-field
+                        label="$1="
+                        :value=yen_doll
+                        prefix="¥"
+                        type="number"
+                        dense
+                        hide-details
+                      ></v-text-field>
+                    </v-col>
+
+                    <v-col class="col-4">
+                      <div> price:<br/> ¥{{ calc_yen }}</div>
+                    </v-col>
+                  </v-row>
+                </v-expansion-panel-content>
+              </v-expansion-panel>
+            </v-expansion-panels>
+
+            <v-row class="justify-center">
+              <div class="flex-grow-1">
+                <div class="ma-5">
+                  <div class="accent text-h5">Generated Text</div>
+                  <pre class="retbox">{{ generated_text }}</pre>
+                </div>
+              </div>
+            </v-row>
+          </div>
+
+        </v-container>
+      </v-main>
+    </v-app>
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script src="./sse.js"></script>
+  <script>
+    const LOCAL_URL = "./";
+
+    const LLAMA2CHAT_TMPL_SYS_START = `<s>[INST] <<SYS>>\n`;
+    const LLAMA2CHAT_TMPL_SYS_END = `<</SYS>>\n`;
+    const LLAMA2CHAT_TMPL_USR_END = `[/INST]\n`;
+    const PROMPT_Q_MARKER = "質問: ";
+
+    new Vue({
+      el: '#app',
+      vuetify: new Vuetify(),
+
+      data:() => ({
+        // components
+        toast:{
+          show: false,
+          timeout: 5000,
+          type: "primary",
+          text:""
+        },
+
+        // Auth
+        isAuthLoading: false,
+        token: {
+          expiration: "",
+          ims_user_id: ""
+        },
+
+        // Discovery API
+        dc_param_dialog: false,
+        dc_paramjson: JSON.stringify({
+          "projectId": "", 
+          "collectionIds":[],
+          "filter": "",
+          "passages":{
+              "enabled":true,
+              "find_answers":true,
+              "per_document":true
+          },
+          "count":5,
+          // "aggregation":"",
+          "_return":[],
+          // "naturalLanguageQuery":""
+        }),
+
+        dc_projects: [],
+        dc_project_selected: "",
+        dc_collections: [],
+        dc_collections_selected: [],
+
+        dc_inputnlq: "",
+        dc_inputnlq_items:[
+          "一元配置分散分析とは？", "ライトプランはまだ使えますか？", "Watsonとは？", 
+        ],
+        dc_isAF: true,
+
+        dc_tbl_loading: false,
+        dc_outputjsons: [],
+
+        // watsonx.ai API
+        isLoading: false,
+
+        yen_doll: 140,
+        doll_per_token: 0.0000006,
+
+        // Fundation Models
+        model_items: [
+          {name:"[Meta] llama-2-70b-chat (70B)", val:"meta-llama/llama-2-70b-chat", class:"3"},
+          {name:"[bigscience] mt0-xxl (13B)", val:"bigscience/mt0-xxl", class:"2"},
+
+          {name:"[IBM] mpt-7b-instruct2 (7B)", val:"ibm/mpt-7b-instruct2", class:"1"},
+          {name:"[IBM] granite-13b-chat-v1 (13B)", val:"ibm/granite-13b-chat-v1", class:"2"},
+          {name:"[IBM] granite-13b-instruct-v1 (13B)", val:"ibm/granite-13b-instruct-v1", class:"2"},
+
+          {name:"[Google] flan-ul2 (20B)", val:"google/flan-ul2", class:"3"},
+          {name:"[Google] flan-t5-xxl (11B)", val:"google/flan-t5-xxl", class:"2"},
+          {name:"[eleutherai] gpt-neox-20b (20B)", val:"eleutherai/gpt-neox-20b", class:"3"},
+
+          {name:"[bigcode] starcoder (15.5B)" , val:"bigcode/starcoder", class:"2"},
+        ],
+        model_selected: {},
+
+        // Option Parameters
+        stream: false, // not supported yet.
+        decoding_method: false,
+        min_max_tokens: [20, 100],
+
+        system_prompt:`${PROMPT_Q_MARKER}に簡潔に答えてください。。日本語のみ出力してください。`,
+        user_prompt:"",
+
+        // result infos
+        input_token_count: 0,
+        generated_token_count: 0,
+        stop_reason: "",
+        generated_text: "",
+      }),
+
+      watch: {
+        // WD
+        dc_project_selected: function(pid) {
+          console.log("[dc_projects_selected] change", pid.project_id);
+          let param = JSON.parse(this.dc_paramjson);
+          param.projectId = pid.project_id;
+          this.dc_paramjson = JSON.stringify(param);
+
+          this.listCollections();
+        },
+
+        dc_collections_selected: function(cids) {
+          console.log("[dc_collections_selected] change", cids);
+          let param = JSON.parse(this.dc_paramjson);
+          param.collectionIds = cids.map(c => c.collection_id);
+          this.dc_paramjson = JSON.stringify(param);
+        },
+
+        dc_isAF: function(onoff) {
+          console.log("[dc_isAF] change", onoff);
+          let param = JSON.parse(this.dc_paramjson);
+          param.passages.find_answers = onoff;
+          this.dc_paramjson = JSON.stringify(param);
+        },
+
+        // wx.ai
+        model_selected: function(model) {
+          console.log("watch > model_selected: " + model.val);
+          if (model.class === 2) {
+            this.doll_per_token = 0.0000018;
+          } else if (model.class === 3){
+            this.doll_per_token = 0.0000050;
+          } else {
+            this.doll_per_token = 0.0000006;
+          }
+        }
+      },
+
+      computed: {
+        calc_yen: function(){
+          let token_count = this.input_token_count + this.generated_token_count;
+          return (token_count * this.doll_per_token).toFixed(2);
+        }
+      },
+
+      methods: {
+        // components
+        showToast(msg) {
+          this.toast.text = msg;
+          this.toast.show = true;
+        },
+
+        // util
+        convertUnixTime(unix) {
+          let timestring = "";
+          if (unix) {
+            timestring = new Date(unix * 1000).toLocaleString();
+          }
+          return timestring;
+        },
+
+        // Auth
+        getToken() {
+          let self = this;
+          this.isAuthLoading = true;
+          this.token = "";
+
+          fetch(`${LOCAL_URL}token`)
+            .then(res => res.json())
+            .then(dt => {
+              console.log(dt);
+              if (dt) self.token = dt;
+              this.isAuthLoading = false;
+            })
+        },
+
+      // WD
+        getMdiIcon(type) {
+          // console.log("[Main][getMdiIcon]", type);
+
+          let mdiname = "mdi-file-question-outline";
+          switch (type) {
+            case "html":
+              mdiname = "mdi-language-html5";
+              break;
+            case "pdf":
+              mdiname = "mdi-file-pdf-box";
+              break;
+            case "jpg":
+            case "jpeg":
+              mdiname = "mdi-file-jpg-box";
+              break;
+            case "xls":
+            case "xlsx":
+              mdiname = "mdi-microsoft-excel";
+              break;
+            case "word":
+            case "doc":
+            case "docx":
+              mdiname = "mdi-microsoft-word";
+              break;
+            case "powerpoint":
+            case "ppt":
+            case "pptx":
+              mdiname = "mdi-microsoft-powerpoint";
+              break;
+            case "csv":
+              mdiname = "mdi-file-delimited-outline";
+              break;
+          }
+          return mdiname;
+        },
+
+        getCollectionsNames(coll_id) {
+          let col = this.dc_collections.find(col => col.collection_id === coll_id);
+          if (col) {
+            return col.name;
+          } else {
+            return null;
+          }
+        },
+
+        // Send Request
+        async callapi(method, api, params) {
+          console.log("[callapi]", api);
+
+          console.log("fetch start");
+          let res = await fetch(`${LOCAL_URL}api`, {
+            method: method,
+            // mode: "cors",
+            // cache: "no-cache",
+            headers: {
+              "Content-Type": "application/json",
+              'Authorization': 'Basic ' + btoa('test' + ":" + 'test')
+            },
+            body: JSON.stringify({
+              "api":api,
+              "params":params}
+            )
+          });
+          console.log("fetch end", res);
+          if (!res.ok) {
+            throw new Error(`status = ${res.status}, statusText = ${res.statusText}`);
+          } 
+          const jsondata = await res.json();
+          // console.log("jsondata : " + JSON.stringify(jsondata));
+          return jsondata;
+        },
+
+        async listProjects(showtoast) {
+          console.log("[listProjects]", this.dc_paramjson);
+
+          let jsn = JSON.parse(this.dc_paramjson);
+          if (!jsn) return
+
+          let prm = {};
+
+          // clear
+          this.dc_projects = [];
+          this.dc_collections = [];
+
+          let ret = await this.callapi("POST", "listProjects", prm);
+          if (ret) {
+            this.dc_projects = ret.projects;
+            this.dc_project_selected = ret.projects[0]; // set first item
+            console.log(ret);
+            if (showtoast) this.showToast("プロジェクトの取得が完了しました");
+            return true;
+          } else {
+            if (showtoast) this.showToast("プロジェクトの取得が失敗しました");
+            return false;
+          }
+        },
+
+        async listCollections(showtoast) {
+          console.log("[listCollections]", this.dc_paramjson);
+
+          let jsn = JSON.parse(this.dc_paramjson);
+          if (!jsn) return
+
+          let prm = {
+            "projectId": this.dc_project_selected.project_id
+          };
+          console.log(prm);
+
+          // clear collections
+          this.dc_collections = [];
+          this.dc_collections_selected = [];
+
+          let ret = await this.callapi("POST", "listCollections", prm);
+          if (ret) {
+            this.dc_collections = ret.collections;
+            if (showtoast) this.showToast("コレクションの取得が完了しました");
+            return true;
+          } else {
+            if (showtoast) this.showToast("コレクションの取得が失敗しました");
+            return false;
+          }
+        },
+
+        async sendQuery(showtoast) {
+          console.log("[sendQuery]", this.dc_paramjson);
+
+          let jsn = JSON.parse(this.dc_paramjson);
+          if (!jsn) return
+
+          // NLQ
+          if (this.dc_inputnlq) {
+            jsn.naturalLanguageQuery = this.dc_inputnlq.replace(/\n/g,'');
+          } else {
+            jsn.naturalLanguageQuery = "";
+          }
+
+          // clear table views
+          this.dc_outputjsons = [];
+
+          let prm = JSON.parse(JSON.stringify(jsn)); // deep copy.
+          this.dc_tbl_loading = true;
+
+          let ret = true;
+          let ret_json = await this.callapi("POST", "query", prm);
+          if (ret_json) {
+            this.setResultTable(ret_json);
+            if (showtoast) this.showToast("データの取得が完了しました");
+          } else {
+            if (showtoast) this.showToast("データの取得が失敗しました");
+            ret = false;
+          }
+          this.dc_tbl_loading = false;
+          return ret;
+        },
+
+        // Result
+        setResultTable(json) {
+          // convert json to array for table.
+          console.log("[setResultTable]");
+          if (!json.results) return;
+          console.log(json);
+          let target = [];
+
+          let cnt = 1;
+          let len = json.results.length;
+          for (let i=0; i<len; i++) {
+
+            let item = json.results[i];
+            if (item && item.document_passages) {
+              // create folder path text.
+              if (item.metadata &&
+                  item.metadata.source) {
+                item.metadata.source.path_text = ""; // init new field.
+
+                if (item.metadata &&
+                    item.metadata.source &&
+                    item.metadata.source.path_collection &&
+                    item.metadata.source.path_collection.entries) {
+                    let folderpath = item.metadata.source.path_collection.entries;
+                    if (folderpath.length > 0) {
+                      if (folderpath[0].name !== "すべてのファイル") folderpath = folderpath.reverse();
+                        item.metadata.source.path_text = folderpath.map(item => item.name).join(" > ");
+                    }
+                }
+              }
+              
+              // set only use datas.
+              target.push({
+                "no": cnt,
+                "document_id": item.document_id,
+                "result_metadata": item.result_metadata,
+                "extracted_metadata":item.extracted_metadata,
+                "metadata": item.metadata,
+                "document_passages":item.document_passages,
+                "projectId": item.projectId,
+
+                // for customize 
+                "question": item.question,
+                "answer": item.answer
+              });
+              cnt++;
+            }
+          }
+          console.log(target);
+          this.dc_outputjsons = target;
+        },
+
+        // on Search button
+        async onSearchBtn() {
+          console.log("[onSearchBtn]");
+          if (await this.sendQuery()){
+            this.createPromptShot();
+            this.onSendBtn();
+          }
+        },
+
+      // wx.ai
+        createPromptShot(){
+          console.log("[createPromptShot]");
+          this.user_prompt = "";
+          this.dc_outputjsons.forEach(item => {
+            let ans_cof = item.document_passages?.[0]?.answers?.[0]?.confidence;
+            // Use AnswerFindings Confidence 0.5point over.
+            if (ans_cof >= 0.5) {
+              let ans = item.document_passages?.[0]?.answers?.[0]?.answer_text;
+              let psg = item.document_passages?.[0]?.passage_text;
+
+              // Remove <em> tags.
+              psg = psg.replace(/<em>/g,'').replace(/<\/em>/g,'');
+
+              if (this.user_prompt.length > 0) this.user_prompt += "\n\n";
+              this.user_prompt += `${ans}\n\n${psg}`;
+            }
+          });
+          this.user_prompt += `\n\n${PROMPT_Q_MARKER}${this.dc_inputnlq}`;
+        },
+
+        sendRequest(){
+          let self = this;
+          let params = {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            method: "POST"
+          };
+
+          let prompt = "";
+          if ((/llama-2-.*-chat/).test(this.model_selected.val)) {
+            // set optimized prompt for llama2 chat
+            prompt = `${LLAMA2CHAT_TMPL_SYS_START}`;
+            prompt += `${this.system_prompt}${LLAMA2CHAT_TMPL_SYS_END}\n`;
+            prompt += `${this.user_prompt}\n${LLAMA2CHAT_TMPL_USR_END}`;
+          } else {
+            prompt = `${this.system_prompt}\n\n${this.user_prompt}\n\n`;
+          }
+
+          let options = {
+            "apikey": this.token.access_token, // for Bearer in brige server.
+
+            "model_id": this.model_selected.val,
+            // "inputs": [ prompt ],
+            "input": prompt,
+
+            "parameters": {
+              // "stream": this.stream,
+              "decoding_method": (this.decoding_method) ? "sample":"greedy",
+              // "temperature": 0.84,
+              // "top_p": 1,
+              // "top_k": 50,
+              // "random_seed": 111,
+              "repetition_penalty": 1.1,
+              "min_new_tokens": this.min_max_tokens[0],
+              "max_new_tokens": this.min_max_tokens[1]
+            },
+          };
+          console.log(options);
+
+          // send request
+        /*
+          if (this.stream) {
+            // Stream on
+            params.payload = JSON.stringify(options);
+
+            let evtSource = new SSE(`${LOCAL_URL}generation`, params);
+            evtSource.addEventListener("message", function (e) {
+              // Assuming we receive JSON-encoded data payloads:
+              console.log(e);
+              if (e.data === "[DONE]" || e.data === "") {
+                console.log("Response DONE!");
+                self.isLoading = false;
+                return;
+              }
+              if (e.data) {
+                var dt = JSON.parse(e.data);
+                if (dt.results) setResult(dt);
+              }
+            });
+            evtSource.stream();
+
+          } else {
+        */
+            // Stream off
+            params.body = JSON.stringify(options);
+            // console.log(params.body);
+
+            fetch(`${LOCAL_URL}generation`, params)
+              .then(res => res.json())
+              .then(dt => {
+                console.log(dt);
+                this.isLoading = false;
+                if (dt && dt.results) setResult(dt);
+              })
+          /*}*/
+          
+          function setResult(dt) {
+            if (dt.results[0]) {
+              if (dt.results[0].input_token_count) {
+                self.input_token_count = dt.results[0].input_token_count;
+              }
+              if (dt.results[0].generated_token_count) {
+                self.generated_token_count = dt.results[0].generated_token_count;
+              }
+              if (dt.results[0].stop_reason) {
+                self.stop_reason = dt.results[0].stop_reason;
+              }
+              if (dt.results[0].generated_text) {
+                self.generated_text += dt.results[0].generated_text;
+              }
+            }
+          }
+        },
+
+        clearResult() {
+          this.input_token_count = 0;
+          this.generated_token_count = 0;
+          this.stop_reason = "";
+          this.generated_text = "";
+        },
+
+        onSendBtn(){
+          console.log("[onSendBtn]");
+          this.clearResult();
+          this.isLoading = true;
+          this.sendRequest();
+        },
+
+        // init
+        async init() {
+          let ret_prj = await this.listProjects();
+          console.log("[init] listProjects return:", ret_prj);
+        }
+      },
+      mounted() {
+        console.log("vue mounted.");
+        this.init();
+
+        // init Select box
+        this.model_selected = this.model_items[0];
+
+        // init IBMCloud auth info
+        this.getToken();
+      }
+    })
+  </script>
+</body>
+</html>
