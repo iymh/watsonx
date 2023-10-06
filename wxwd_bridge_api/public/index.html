@@ -448,7 +448,7 @@
 
         dc_inputnlq: "",
         dc_inputnlq_items:[
-          "一元配置分散分析とは？", "ライトプランはまだ使えますか？", "Watsonとは？", 
+          "一元配置分散分析とは？", "ライトプランはまだ使えますか？", "Watsonとは？", "印刷ができない",
         ],
         dc_isAF: true,
 
@@ -802,6 +802,10 @@
 
               if (this.user_prompt.length > 0) this.user_prompt += "\n\n";
               this.user_prompt += `${ans}\n\n${psg}`;
+            } else {
+              if (item.answer && item.question) {
+                this.user_prompt += `Q: ${item.question}\nA: ${item.answer}`;
+              }
             }
           });
           this.user_prompt += `\n\n${PROMPT_Q_MARKER}${this.dc_inputnlq}`;
