@@ -1,7 +1,7 @@
 # watsonx .ai & Watson Discovery Build Assets
 
 ## 前提条件
-* [wd_bridge_api](../../wd_bridge_api/), [wx_bridge_api](../wx_bridge_api/) の環境構築ができている
+* [wd_bridge_api](https://github.com/iymh/wd_bridge_api), [wx_bridge_api](https://github.com/iymh/watsonx/tree/main/wx_bridge_api) の環境構築ができている
 
 ## 使用しているJavaScriptライブラリ
 * [Vue.js](https://jp.vuejs.org/v2/guide/) 2系
