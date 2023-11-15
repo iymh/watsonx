@@ -694,7 +694,7 @@
         },
 
         async sendQuery(showtoast) {
-          console.log("[sendQuery]", this.dc_paramjson);
+          console.log("[sendQuery]", this.dc_paramjson, this.dc_inputnlq);
 
           let jsn = JSON.parse(this.dc_paramjson);
           if (!jsn) return
@@ -780,10 +780,12 @@
         // on Search button
         async onSearchBtn() {
           console.log("[onSearchBtn]");
-          if (await this.sendQuery()){
-            this.createPromptShot();
-            this.onSendBtn();
-          }
+          setTimeout(async() => {
+            if (await this.sendQuery()){
+              this.createPromptShot();
+              this.onSendBtn();
+            }
+          }, 0);
         },
 
       // wx.ai
