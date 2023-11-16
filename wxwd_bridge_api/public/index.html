@@ -534,7 +534,7 @@
       computed: {
         calc_yen: function(){
           let token_count = this.input_token_count + this.generated_token_count;
-          return (token_count * this.doll_per_token).toFixed(2);
+          return (token_count * this.doll_per_token).toFixed(8);
         }
       },
 
