@@ -1,0 +1,120 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "RAG2 Bridge API",
+    "description": "API for accessing the IBM CodeEngine App",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://wx-rag2.16rb22uobum2.jp-tok.codeengine.appdomain.cloud",
+      "description": "OpenAI API server"
+    }
+  ],
+  "paths": {
+    "/answer": {
+      "post": {
+        "summary": "RAG2 server",
+        "description": "RAG2 server",
+        "operationId": "answer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "description": "Question text."
+                  },
+
+                  "dc_params": {
+                    "type": "object",
+                    "description": "Watson Discovery params",
+                    "properties": {
+                      "projectId": {
+                        "type": "string",
+                        "description": "ProjectID."
+                      },
+                      "count":{
+                        "type":"number",
+                        "description": ""
+                      }
+                    }
+                  },
+
+                  "wx_params": {
+                    "type": "object",
+                    "description": "watsonx.ai params",
+                    "properties": {
+                      "model_id": {
+                        "type": "string",
+                        "description": "LLM modelID."
+                      },
+                      "decoding_method": {
+                        "type": "string",
+                        "description": ""
+                      },
+                      "min_new_tokens":{
+                        "type":"number",
+                        "description": ""
+                      },
+                      "max_new_tokens":{
+                        "type":"number",
+                        "description": ""
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A successful response with the generated text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "generated_text": {
+                      "type": "string",
+                      "description": "The generated text."
+                    },
+                    "generated_token_count":{
+                      "type":"number",
+                      "description": ""
+                    },
+                    "input_token_count":{
+                      "type":"number",
+                      "description": ""
+                    },
+                    "stop_reason":{
+                      "type":"string",
+                      "description": ""
+                    }
+
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+          }
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+    }
+  }
+}
