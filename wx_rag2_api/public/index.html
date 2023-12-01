@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watson Discovery & watsonx.ai</title>
+  <style>
+    [v-cloak] {
+      display: none;
+    }
+    .wdt2 {
+      width: 2rem;
+    }
+    .wdt5 {
+      width: 5rem;
+    }
+    .wdt10 {
+      width: 10rem;
+    }
+    .wdt12 {
+      width: 12rem;
+    }
+
+    /* for highlight in discovery result. */
+    em {
+      font-weight: bold;
+      color: red;
+    }
+
+    .retbox {
+      /* width: 95vw; */
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app" v-cloak>
+    <v-app>
+      <v-app-bar app>
+        <v-app-bar-title>RAG2.0 API</v-app-bar-title>
+        <v-spacer></v-spacer>
+      </v-app-bar>
+
+      <v-main>
+        <v-container>
+
+          <v-divider></v-divider>
+          <div class="ma-2">
+            <v-row class="justify-center align-center ma-3">
+              <v-combobox
+                class="flex-grow-1 ma_lr_1rem ma_tp_05rem"
+                v-model="dc_inputnlq"
+                :items="dc_inputnlq_items"
+                label="Natural Language Query"
+                outlined
+                clearable
+                counter
+                dense
+                rows="1"
+                ref="nlq_combobox"
+              ></v-combobox>
+
+              <v-btn
+                color="primary"
+                elevation="1"
+                fab
+                :loading="isLoading"
+                @click="onSearchBtn()">
+                <v-icon>mdi-card-search-outline</v-icon>
+              </v-btn>
+            </v-row>
+
+            <v-textarea
+              v-model="dc_paramjson"
+              label="WD Params"
+              outlined
+              rows="3"
+            ></v-textarea>
+
+            <v-textarea
+              v-model="wx_paramjson"
+              label="WX Params"
+              outlined
+              rows="3"
+            ></v-textarea>
+
+            <v-row class="justify-center">
+              <div class="flex-grow-1">
+                <div class="ma-5">
+                  <div class="accent text-h5">Generated Text</div>
+                  <pre class="retbox">{{ generated_text }}</pre>
+                </div>
+              </div>
+            </v-row>
+          </div>
+
+        </v-container>
+      </v-main>
+    </v-app>
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script>
+    const LOCAL_URL = "./";
+
+    new Vue({
+      el: '#app',
+      vuetify: new Vuetify(),
+
+      data:() => ({
+        // components
+        toast:{
+          show: false,
+          timeout: 5000,
+          type: "primary",
+          text:""
+        },
+
+        // Discovery API
+        dc_param_dialog: false,
+        dc_paramjson: JSON.stringify({
+          "projectId": "", 
+          // "collectionIds":[],
+          // "filter": "",
+          "passages":{
+              "enabled":true,
+              "find_answers":true,
+              "per_document":true
+          },
+          "count":3,
+          // "aggregation":"",
+          // "_return":[],
+          // "naturalLanguageQuery":""
+        }),
+
+        dc_inputnlq: "",
+        dc_inputnlq_items:[
+          "どこでもドアとは", "一元配置分散分析とは？", "ライトプランはまだ使えますか？", "印刷ができない", 
+        ],
+
+        dc_tbl_loading: false,
+        dc_outputjsons: [],
+
+        // watsonx.ai API
+        isLoading: false,
+
+        wx_paramjson: JSON.stringify({
+          "model_id": "meta-llama/llama-2-70b-chat",
+          // "input": "",
+          "parameters": {
+            "decoding_method": "greedy",
+            // "temperature": 0.84,
+            // "top_p": 1,
+            // "top_k": 50,
+            // "random_seed": 111,
+            "repetition_penalty": 1.0,
+            "min_new_tokens": 0,
+            "max_new_tokens": 200
+          },
+        }),
+
+        generated_text: "",
+      }),
+
+      methods: {
+        async sendQuery() {
+          console.log("[sendQuery]", this.dc_paramjson, this.dc_inputnlq);
+
+          let dc_jsn = JSON.parse(this.dc_paramjson);
+          if (!dc_jsn) dc_jsn = {};
+
+          let wx_jsn = JSON.parse(this.wx_paramjson);
+          if (!wx_jsn) wx_jsn = {};
+
+          // NLQ
+          let question = (this.dc_inputnlq) ? this.dc_inputnlq.replace(/\n/g,'') : "";
+
+          this.isLoading = true;
+          this.generated_text = "";
+
+          let ret = true;
+          let ret_json = await fetch(`${LOCAL_URL}answer`, {
+            method: "POST",
+            // mode: "cors",
+            // cache: "no-cache",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              "question" : question,
+              "dc_params": dc_jsn,
+              "wx_params": wx_jsn,
+            })
+          });
+          let ret_data = await ret_json.json();
+          console.log(ret_data);
+          if (ret_data) {
+            this.generated_text = ret_data.generated_text;
+          }
+          this.isLoading = false;
+          return;
+        },
+
+        onSearchBtn(){
+          console.log("[onSearchBtn]");
+          this.sendQuery();
+        },
+
+      },
+      mounted() {
+        console.log("vue mounted.");
+        
+        this.dc_inputnlq = this.dc_inputnlq_items[0];
+      }
+    })
+  </script>
+</body>
+</html>
