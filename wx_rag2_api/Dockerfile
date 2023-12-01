@@ -10,6 +10,6 @@ RUN cd /app; npm ci --only=production
 FROM gcr.io/distroless/nodejs20
 COPY --from=build-env /app /app
 WORKDIR /app
-ENV PORT 8080
+ENV PORT 3000
 EXPOSE 8080
 CMD [ "server.js" ]
