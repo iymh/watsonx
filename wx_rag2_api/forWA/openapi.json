@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://wx-rag2.16rb22uobum2.jp-tok.codeengine.appdomain.cloud",
+      "url": "https://wx-rag2.xxxxxxxxxx.jp-tok.codeengine.appdomain.cloud",
       "description": "OpenAI API server"
     }
   ],

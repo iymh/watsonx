@@ -113,6 +113,11 @@ node server.js
       <img src="./doc/wa_ext2.png" width="50%">
     </div>
   * OpenAPIの設定ファイルを登録
+    * "/forWA/openapi.json" を編集する
+    * CodeEngine等に作成した外部URLを貼り付ける
+      <div>
+        <img src="./doc/vs1.png" width="80%">
+      </div>
     * "/forWA/openapi.json" を登録する
       <div>
         <img src="./doc/wa_ext3.png" width="80%">
