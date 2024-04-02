@@ -46,7 +46,7 @@ server
          res.status(500).send({"error": "Invalid params!"});
          return;
       }
-      let sendurl = `${process.env.WX_URL}ml/v1-beta/generation/text?version=2023-05-29`;
+      let sendurl = `${process.env.WX_URL}ml/v1/text/generation?version=2023-05-29`;
 
       let options = {
          headers: {

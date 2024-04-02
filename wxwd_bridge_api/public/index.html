@@ -463,18 +463,11 @@
 
         // Fundation Models
         model_items: [
-          {name:"[Meta] llama-2-70b-chat (70B)", val:"meta-llama/llama-2-70b-chat", class:"3"},
-          {name:"[bigscience] mt0-xxl (13B)", val:"bigscience/mt0-xxl", class:"2"},
+          {name:"[Mistral] mixtral-8x7b-instruct-v01-q" , val:"ibm-mistralai/mixtral-8x7b-instruct-v01-q", class:"2"},
+          {name:"[Meta] llama-2-70b-chat", val:"meta-llama/llama-2-70b-chat", class:"2"},
 
-          {name:"[IBM] mpt-7b-instruct2 (7B)", val:"ibm/mpt-7b-instruct2", class:"1"},
-          {name:"[IBM] granite-13b-chat-v1 (13B)", val:"ibm/granite-13b-chat-v1", class:"2"},
-          {name:"[IBM] granite-13b-instruct-v1 (13B)", val:"ibm/granite-13b-instruct-v1", class:"2"},
-
-          {name:"[Google] flan-ul2 (20B)", val:"google/flan-ul2", class:"3"},
-          {name:"[Google] flan-t5-xxl (11B)", val:"google/flan-t5-xxl", class:"2"},
-          {name:"[eleutherai] gpt-neox-20b (20B)", val:"eleutherai/gpt-neox-20b", class:"3"},
-
-          {name:"[bigcode] starcoder (15.5B)" , val:"bigcode/starcoder", class:"2"},
+          {name:"[IBM] granite-13b-chat-v2", val:"ibm/granite-13b-chat-v2", class:"2"},
+          {name:"[IBM] granite-13b-instruct-v2", val:"ibm/granite-13b-instruct-v2", class:"2"},
         ],
         model_selected: {},
 
@@ -823,7 +816,8 @@
           };
 
           let prompt = "";
-          if ((/llama-2-.*-chat/).test(this.model_selected.val)) {
+          if (((/llama-2-.*-chat/).test(this.model_selected.val)) ||
+              ((/mixtral-.*/).test(this.model_selected.val))) {
             // set optimized prompt for llama2 chat
             prompt = `${LLAMA2CHAT_TMPL_SYS_START}`;
             prompt += `${this.system_prompt}${LLAMA2CHAT_TMPL_SYS_END}\n`;
